@@ -1,0 +1,23 @@
+name: eurogrid
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - numpy
+  - xarray
+  - dask
+  - zarr<3
+  - fsspec
+  - aiohttp
+  - polars
+  - pyarrow
+  - pyyaml
+  - requests
+  - matplotlib
+  - cartopy
+  - pytest
+  - pytest-socket
+  - ruff
+  - pip
+  - pip:
+      - -e .
