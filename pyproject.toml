@@ -13,6 +13,7 @@ dependencies = [
   "dask[array]>=2024.6",
   "zarr>=2.18,<3",
   "fsspec>=2024.6",
+  "gcsfs>=2024.6",
   "aiohttp>=3.9",
   "polars>=1.0",
   "pyarrow>=15",

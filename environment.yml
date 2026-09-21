@@ -8,6 +8,7 @@ dependencies:
   - dask
   - zarr<3
   - fsspec
+  - gcsfs
   - aiohttp
   - polars
   - pyarrow
