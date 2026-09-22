@@ -20,10 +20,13 @@ smard:
   cache_dir: "data/smard"
 
 era5:
-  # Two different ARCO stores: single-level for 100 m winds, pressure-level for Z500.
+  # verified 2026-09-21: one ARCO store carries 100 m winds, sp and 37-level geopotential;
+  # hourly, chunks = 1 timestep x globe (3-D: x 37 levels), valid_time_stop 2026-06-30.
+  store: "gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3"
   single_level_vars: ["100m_u_component_of_wind", "100m_v_component_of_wind", "surface_pressure"]
   pressure_level_vars: ["geopotential"]
   z500_level_hpa: 500
+  z500_stride_hours: 6      # each Z500 hour costs a full 37-level global chunk; TM1990 is daily
   cache_dir: "data/era5"
 
 eerie:
