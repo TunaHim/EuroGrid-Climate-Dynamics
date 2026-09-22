@@ -15,6 +15,7 @@ dependencies = [
   "fsspec>=2024.6",
   "gcsfs>=2024.6",
   "matplotlib>=3.8",
+  "cartopy>=0.24",
   "aiohttp>=3.9",
   "polars>=1.0",
   "pyarrow>=15",
