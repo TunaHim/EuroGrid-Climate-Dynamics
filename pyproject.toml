@@ -23,7 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-socket>=0.7", "ruff>=0.5"]
+dev = ["pytest>=8", "pytest-socket>=0.7", "ruff>=0.5", "jupyterlab>=4"]
 dashboard = ["streamlit>=1.35", "plotly>=5.20"]
 
 [tool.setuptools.packages.find]
