@@ -66,6 +66,12 @@ blocking:                 # Tibaldi & Molteni (1990)
   ghgn_threshold_m_per_deg: -10.0
   min_persistence_days: 5
   min_sector_width_deg: 20.0
+  benchmark_windows:
+    - {label: "2020-21", start: "2020-12-01T00:00:00", end: "2021-03-01T00:00:00"}
+    - {label: "2021-22", start: "2021-12-01T00:00:00", end: "2022-03-01T00:00:00"}
+    - {label: "2022-23", start: "2022-12-01T00:00:00", end: "2023-03-01T00:00:00"}
+    - {label: "2023-24", start: "2023-12-01T00:00:00", end: "2024-03-01T00:00:00"}
+    - {label: "2024-25", start: "2024-12-01T00:00:00", end: "2025-03-01T00:00:00"}
 
 dunkelflaute:
   capacity_factor_thresholds: [0.05, 0.10, 0.15, 0.20]   # swept, not fixed

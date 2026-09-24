@@ -139,6 +139,77 @@ def load_era5(
     return _validate(xr.open_zarr(path, consolidated=True))
 
 
+def load_era5_z500(
+    start: datetime,
+    end: datetime,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    cache_dir: str | Path = "data/era5",
+    z500_stride_hours: int = 6,
+    store: xr.Dataset | None = None,
+) -> xr.DataArray:
+    """Load only Z500 for blocking studies and persist it as a local Zarr.
+
+    This avoids downloading the hourly wind and surface-pressure fields when
+    a blocking benchmark needs only the 500 hPa geopotential-height field.
+    """
+    cache_dir = Path(cache_dir)
+    key = (
+        f"era5_z500_{start:%Y%m%dT%H}_{end:%Y%m%dT%H}"
+        f"_lat{lat_min:g}_{lat_max:g}_lon{lon_min:g}_{lon_max:g}_z{z500_stride_hours}h.zarr"
+    )
+    path = cache_dir / key
+    if path.exists():
+        return xr.open_zarr(path, consolidated=True)["z500"]
+
+    raw = store if store is not None else open_arco_era5()
+    _check_time_window(raw, start, end)
+    raw = raw[["geopotential"]].sel(
+        time=slice(start, end),
+        level=[Z500_LEVEL_HPA],
+    )
+    raw = raw.sel(time=raw.time < np.datetime64(end))
+    if raw.sizes["time"] == 0:
+        raise ValueError(f"no ERA5 timesteps in [{start}, {end})")
+
+    z500 = raw["geopotential"].sel(level=Z500_LEVEL_HPA, drop=True)
+    z500 = z500.isel(time=slice(None, None, z500_stride_hours))
+    z500 = (z500.rename({"latitude": "lat", "longitude": "lon"}) / G0).rename(time="time_z500")
+    z500 = z500.transpose("time_z500", "lat", "lon")
+    z500.attrs = {
+        "units": "m",
+        "long_name": "500 hPa geopotential height",
+        "stride_hours": z500_stride_hours,
+    }
+    z500 = subset_domain(
+        roll_longitude(z500),
+        lat_min,
+        lat_max,
+        lon_min,
+        lon_max,
+    )
+    _validate_z500(z500)
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    z500 = z500.chunk({"time_z500": 24})
+    dataset = z500.to_dataset(name="z500")
+    dataset.attrs["source"] = "era5"
+    for var in dataset.variables:
+        dataset[var].encoding = {}
+    dataset.to_zarr(path, mode="w", consolidated=True)
+    return xr.open_zarr(path, consolidated=True)["z500"]
+
+
+def _validate_z500(z500: xr.DataArray) -> xr.DataArray:
+    """Validate a standalone Z500 array against the canonical contract."""
+    dataset = z500.rename(time_z500="time").to_dataset(name="z500")
+    dataset.attrs["source"] = "era5"
+    validate_canonical(dataset)
+    return z500
+
+
 def _main() -> None:  # pragma: no cover - thin CLI
     import argparse
 
