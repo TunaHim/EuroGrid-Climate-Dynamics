@@ -122,6 +122,31 @@ The detector is intentionally presented as a sequence:
 3. Does it last at least five days, long enough to matter for persistent
    renewable-weather conditions?
 
+### Historical ERA5 renewable-weather benchmark — completed
+
+The five blocking winters now also have complete December–February hourly 100 m
+wind coverage in the same canonical ERA5 Zarr workflow:
+
+- 2020–21;
+- 2021–22;
+- 2022–23;
+- 2023–24;
+- 2024–25.
+
+The offshore-box calculation uses 53.5–56°N and 3–8.5°E, with cosine-latitude
+weighting. The benchmark notebook now includes:
+
+- December, January, and February mean wind speed for every winter;
+- anomalies relative to the five-winter mean for each calendar month;
+- hourly wind-speed distributions by winter and month;
+- sector-qualified versus non-sector-qualified blocking-time comparisons;
+- persistent (at least five days) versus non-persistent comparisons;
+- blocking-episode duration and mean offshore-box wind-speed summaries.
+
+These are association diagnostics. They ask whether blocking-labelled periods
+co-occurred with different wind-resource conditions; they do not establish that
+blocking caused those conditions.
+
 ## 3. Current notebooks
 
 ### `01_eda.ipynb` — initial data review
@@ -172,14 +197,9 @@ This notebook applies the same detector to five complete winters. It contains:
 - winter-to-winter comparison;
 - a separate offshore-box wind-resource check.
 
-The offshore wind section currently uses the wind caches that exist locally:
-
-- January 2023;
-- November–December 2024.
-
-The five blocking winters have complete **Z500** coverage, but the matching
-100 m wind fields have not yet been downloaded for every winter. Missing wind
-months are shown as missing; they are not treated as zero wind.
+The offshore wind section now uses complete December–February wind coverage
+for all five blocking winters through the same loader and cache format. The raw
+Zarr caches remain local data products and are not committed to Git.
 
 ## 4. What the current results mean
 
@@ -228,7 +248,6 @@ Available:
 ### Not yet available
 
 - GHI / surface solar radiation for the current download set;
-- complete 100 m wind coverage for every blocking benchmark winter;
 - EERIE historical data;
 - EERIE future data;
 - plant-level MaStR locations;
@@ -251,17 +270,13 @@ has been executed successfully after the latest repair.
 
 ## 7. Recommended next steps
 
-### Next step 1 — complete the historical ERA5 renewable-weather benchmark
+### Next step 1 — extend the historical ERA5 renewable-weather benchmark
 
-Download the missing 100 m wind fields for the remaining December–February
-benchmark winters. Then produce the requested three-point winter plot:
-
-- December mean offshore-box wind speed;
-- January mean offshore-box wind speed;
-- February mean offshore-box wind speed.
-
-After that, implement the Dunkelflaute threshold sweep using ERA5 wind,
-solar-related variables when available, and SMARD generation.
+The first complete wind benchmark is now in place. The next historical ERA5
+extension should add the solar variable(s) needed for a defensible
+wind-plus-solar Dunkelflaute threshold sweep, then compare the proxy with SMARD
+generation. This should remain a historical validation step before any model
+evaluation.
 
 ### Next step 2 — add EERIE historical evaluation
 
