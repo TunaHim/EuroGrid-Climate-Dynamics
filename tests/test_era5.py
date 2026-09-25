@@ -5,7 +5,7 @@ import pytest
 import xarray as xr
 
 from eurogrid.contract import G0, validate_canonical
-from eurogrid.data.era5 import load_era5, normalise
+from eurogrid.data.era5 import load_era5, load_era5_z500, normalise
 
 
 def fake_arco(hours: int = 48) -> xr.Dataset:
@@ -73,3 +73,15 @@ def test_load_era5_rejects_out_of_range(tmp_path):
         load_era5(datetime(2023, 1, 1), datetime(2023, 3, 1), **BOX, cache_dir=tmp_path, store=store)
     with pytest.raises(ValueError, match="no ERA5 timesteps"):
         load_era5(datetime(2023, 1, 3), datetime(2023, 1, 4), **BOX, cache_dir=tmp_path, store=store)
+
+
+def test_load_era5_z500_only_caches_the_pressure_field(tmp_path):
+    store = fake_arco()
+    start = datetime(2023, 1, 1)
+    end = datetime(2023, 1, 2)
+    z500 = load_era5_z500(start, end, **BOX, cache_dir=tmp_path, store=store)
+
+    assert z500.dims == ("time_z500", "lat", "lon")
+    assert z500.sizes["time_z500"] == 4
+    assert z500.attrs["units"] == "m"
+    assert list(tmp_path.glob("era5_z500_*.zarr"))
