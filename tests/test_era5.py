@@ -19,6 +19,7 @@ def fake_arco(hours: int = 48) -> xr.Dataset:
     u = np.broadcast_to(((lon + 180) % 360 - 180)[None, None, :], shape).astype("float32")
     v = np.full(shape, 3.0, dtype="float32")
     sp = np.full(shape, 101325.0, dtype="float32")
+    ssrd = np.broadcast_to(np.arange(hours, dtype="float32")[:, None, None] * 3600.0, shape)
     z = np.broadcast_to((level * 100.0)[None, :, None, None], (hours, 3, lat.size, lon.size)).astype(
         "float32"
     )
@@ -27,6 +28,7 @@ def fake_arco(hours: int = 48) -> xr.Dataset:
             "100m_u_component_of_wind": (("time", "latitude", "longitude"), u),
             "100m_v_component_of_wind": (("time", "latitude", "longitude"), v),
             "surface_pressure": (("time", "latitude", "longitude"), sp),
+            "surface_solar_radiation_downwards": (("time", "latitude", "longitude"), ssrd),
             "geopotential": (("time", "level", "latitude", "longitude"), z),
         },
         coords={"time": time, "latitude": lat, "longitude": lon, "level": level},
@@ -57,7 +59,8 @@ def test_load_era5_crops_and_caches(tmp_path):
     assert ds.sizes["time"] == 24 and ds.sizes["time_z500"] == 4  # half-open, strided
     assert ds.lat.values.max() <= 75 and ds.lat.values.min() >= 30
     assert ds.lon.values.min() >= -40 and ds.lon.values.max() <= 40
-    assert set(ds.data_vars) == {"u100", "v100", "ws100", "sp", "z500"}
+    assert set(ds.data_vars) == {"u100", "v100", "ws100", "sp", "ssrd", "z500"}
+    np.testing.assert_allclose(ds["ssrd"].isel(time=2), 2.0)
     zarrs = list(tmp_path.glob("*.zarr"))
     assert len(zarrs) == 1
 

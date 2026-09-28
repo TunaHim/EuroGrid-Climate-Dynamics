@@ -164,7 +164,17 @@ It includes:
 - SMARD generation and installed-capacity checks;
 - approximate zonal capacity maps;
 - explanations of geopotential height, temporal resolution, and weighting;
-- explicit documentation that GHI was **not** downloaded in the current phase.
+- explicit documentation that the current ERA5 download now includes `ssrd`;
+  this is a surface-resource input, not a definitive photovoltaic-generation
+  or GHI product.
+
+### `04_era5_dunkelflaute_benchmark.ipynb` — historical wind-plus-solar benchmark
+
+This separate notebook is the current scientific workbench for the next
+historical step. It explains the weather-resource proxy, event definitions,
+SMARD comparison, missingness, threshold sensitivity, and blocking overlap in
+plain language. The five winters remain a pilot sample rather than a
+multi-decadal climatology.
 
 ### `03_transfer_validation.ipynb` — wind-to-generation validation
 
@@ -247,11 +257,9 @@ Available:
 
 ### Not yet available
 
-- GHI / surface solar radiation for the current download set;
 - EERIE historical data;
 - EERIE future data;
 - plant-level MaStR locations;
-- a validated Dunkelflaute event catalogue;
 - ramp-rate and sampling-aliasing results.
 
 ## 6. Quality checks completed
@@ -268,15 +276,29 @@ The current branch has been checked with:
 The latest local test suite contains 36 passing tests. The benchmark notebook
 has been executed successfully after the latest repair.
 
+### Historical ERA5 solar and Dunkelflaute benchmark — completed locally
+
+The canonical ERA5 loader now includes `surface_solar_radiation_downwards`
+(`ssrd`). ARCO provides this field as hourly accumulated energy in J m⁻²;
+the loader clips tiny negative nighttime round-off values and converts it to
+hourly mean downward shortwave irradiance in W m⁻². It remains named `ssrd`
+rather than being presented as definitive plant-level GHI.
+
+The separate `04_era5_dunkelflaute_benchmark.ipynb` notebook now derives
+cosine-weighted wind and solar-resource series, constructs transparent
+capacity-factor-like weather indices, sweeps thresholds and durations,
+compares the ERA5 proxy with SMARD, and checks overlap with persistent TM1990
+blocking labels. These are association and historical-validation diagnostics,
+not causal attribution.
+
 ## 7. Recommended next steps
 
-### Next step 1 — extend the historical ERA5 renewable-weather benchmark
+### Next step 1 — review and refine the historical Dunkelflaute benchmark
 
-The first complete wind benchmark is now in place. The next historical ERA5
-extension should add the solar variable(s) needed for a defensible
-wind-plus-solar Dunkelflaute threshold sweep, then compare the proxy with SMARD
-generation. This should remain a historical validation step before any model
-evaluation.
+Review the separate solar benchmark notebook, especially the proxy definition,
+threshold and duration sensitivity, and differences from SMARD. Only after
+these historical limitations are understood should the definitions be fixed
+for model evaluation.
 
 ### Next step 2 — add EERIE historical evaluation
 
@@ -303,6 +325,7 @@ For a rendered, read-only notebook view, use nbviewer:
 - <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/01_eda.ipynb>
 - <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/02_era5_blocking_diagnostics.ipynb>
 - <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/03_era5_blocking_benchmark.ipynb>
+- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/04_era5_dunkelflaute_benchmark.ipynb>
 
 GitHub is best for browsing folders and source files. Nbviewer is best for
 reading executed notebook outputs. The temporary JupyterLab preview is best
@@ -312,6 +335,6 @@ sleeps.
 ## 9. Current project status in one sentence
 
 The project has a tested ERA5/SMARD foundation, a validated first
-wind-to-generation baseline, and an explained five-winter ERA5 blocking pilot;
-the next scientific work is to complete the wind benchmark and then evaluate
-historical EERIE behaviour.
+wind-to-generation baseline, complete five-winter wind coverage, and a local
+historical wind-plus-solar benchmark; the next scientific work is to review
+that benchmark before evaluating historical EERIE behaviour.
