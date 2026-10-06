@@ -165,11 +165,14 @@ def validation_metrics(
     if obs.height == 0:
         raise ValueError(f"no overlapping timestamps for {var} in {zone}")
     low_obs = obs.filter(pl.col("cf_obs") < 0.10)
-    low_hit = (
-        float("nan")
-        if low_obs.height == 0
-        else float(low_obs.filter(pl.col("cf_model") < 0.10).height / low_obs.height)
-    )
+    low_model = obs.filter(pl.col("cf_model") < 0.10)
+    hits = low_obs.filter(pl.col("cf_model") < 0.10).height
+    low_hit = float("nan") if low_obs.height == 0 else float(hits / low_obs.height)
+    # the hit rate alone rewards a model that always predicts calm; the
+    # false-alarm ratio and critical success index punish over-calling lows
+    low_far = float("nan") if low_model.height == 0 else float(1.0 - hits / low_model.height)
+    union = low_obs.height + low_model.height - hits
+    low_csi = float("nan") if union == 0 else float(hits / union)
     cf_obs_mean = float(obs["cf_obs"].mean())
     rmse_cf = float(obs["err_cf"].pow(2).mean() ** 0.5)
     return {
@@ -185,4 +188,6 @@ def validation_metrics(
         "rmse_cf": rmse_cf,
         "rmse_cf_rel": rmse_cf / cf_obs_mean if cf_obs_mean > 0 else float("nan"),
         "low_wind_hit_rate": low_hit,
+        "low_wind_far": low_far,
+        "low_wind_csi": low_csi,
     }

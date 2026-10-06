@@ -314,18 +314,19 @@ interpreted together with that historical bias.
 The repository can be browsed like a normal cloud folder on GitHub:
 
 - Repository: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics>
-- Current blocking branch: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/devin/1790244127-blocking-diagnostics>
-- All notebooks: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/devin/1790244127-blocking-diagnostics/notebooks>
-- Configuration: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/devin/1790244127-blocking-diagnostics/config>
-- Source code: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/devin/1790244127-blocking-diagnostics/src>
-- Tests: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/devin/1790244127-blocking-diagnostics/tests>
+- All notebooks: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/main/notebooks>
+- Configuration: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/main/config>
+- Source code: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/main/src>
+- Tests: <https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/main/tests>
 
-For a rendered, read-only notebook view, use nbviewer:
+The notebooks were rebuilt into a four-notebook reading path (about 30
+minutes) on branch `notebooks/climate-reader`. For a rendered, read-only
+view, use nbviewer:
 
-- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/01_eda.ipynb>
-- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/02_era5_blocking_diagnostics.ipynb>
-- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/03_era5_blocking_benchmark.ipynb>
-- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/devin/1790244127-blocking-diagnostics/notebooks/04_era5_dunkelflaute_benchmark.ipynb>
+- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/notebooks/climate-reader/notebooks/01_data.ipynb>
+- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/notebooks/climate-reader/notebooks/02_wind_to_power.ipynb>
+- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/notebooks/climate-reader/notebooks/03_blocking.ipynb>
+- <https://nbviewer.org/github/TunaHim/EuroGrid-Climate-Dynamics/blob/notebooks/climate-reader/notebooks/04_dunkelflaute.ipynb>
 
 GitHub is best for browsing folders and source files. Nbviewer is best for
 reading executed notebook outputs. The temporary JupyterLab preview is best
