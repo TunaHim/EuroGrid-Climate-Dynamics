@@ -43,7 +43,7 @@ src/eurogrid/contract.py  canonical (time, lat, lon) dataset contract every load
 src/eurogrid/data/        loaders: smard, era5, eerie          (phases 01, 02, 06)
 src/eurogrid/diagnostics/ blocking, dunkelflaute, ramp_rates   (phase 04)
 src/eurogrid/models/      wind -> generation transfer          (phase 03)
-dashboard/                thin Streamlit app                   (phase 05)
+dashboard/                thin Streamlit app                   (planned, phase 05)
 tests/                    offline; CI runs with sockets disabled
 ```
 
@@ -54,7 +54,7 @@ tests/                    offline; CI runs with sockets disabled
 | 00 | scaffold, dataset contract, CI | green CI, contract assertions tested |
 | 01 | SMARD client + installed capacity | Jan 2023 and Nov–Dec 2024 cached, offline fixtures |
 | 02 | ERA5 loader (100 m winds, Z500) | one wind map that looks like Europe |
-| 03 | transfer function + SMARD validation | bias/correlation figure by zone |
+| 03 | transfer function + SMARD validation — done, see `notebooks/03_transfer_validation.ipynb` | bias/correlation figure by zone |
 | 04 | TM1990 blocking, Dunkelflaute sweep, ramps + aliasing | blocking frequency vs longitude matches published climatology |
 | 05 | thin dashboard | builds headless |
 | 06 | EERIE historical blocking evaluation | model-vs-reanalysis figure, below-ground fraction reported |
