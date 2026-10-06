@@ -149,35 +149,63 @@ def detect_tm1990(
     return result
 
 
+def _longitude_dilation(values: np.ndarray, half_width: int) -> np.ndarray:
+    """OR each column with its ``half_width`` neighbours along axis 1 (no wrap)."""
+    cum = np.cumsum(values.astype(np.int64), axis=1)
+    nlon = values.shape[1]
+    padded = np.concatenate([np.zeros((values.shape[0], 1), dtype=np.int64), cum], axis=1)
+    lo = np.clip(np.arange(nlon) - half_width, 0, nlon)
+    hi = np.clip(np.arange(nlon) + half_width + 1, 0, nlon)
+    return (padded[:, hi] - padded[:, lo]) > 0
+
+
+def _persistence_run_lengths(active: np.ndarray) -> np.ndarray:
+    """Per-cell length of the consecutive-True run along axis 0 (vectorised)."""
+    out = np.zeros(active.shape, dtype=np.int64)
+    for col in range(active.shape[1]):
+        series = active[:, col]
+        padded = np.r_[False, series, False]
+        starts = np.flatnonzero(~padded[:-1] & padded[1:])
+        ends = np.flatnonzero(padded[:-1] & ~padded[1:])
+        for start, end in zip(starts, ends, strict=True):
+            out[start:end, col] = end - start
+    return out
+
+
 def persistence_summary(
     blocking: xr.DataArray,
     *,
     timestep_hours: float,
     min_persistence_days: float = 5.0,
+    tolerance_deg: float = 10.0,
 ) -> xr.Dataset:
-    """Summarise longitude coverage and domain-wide persistence."""
+    """Longitude coverage plus persistence evaluated *per longitude*.
+
+    A longitude is called persistent while it sits inside an unbroken run
+    (>= ``min_persistence_days``) during which some longitude within
+    +/- ``tolerance_deg`` was blocked every step. The tolerance lets a
+    slow-drifting block count as one event instead of several. Because the
+    persistence flag is only applied where the sector mask is already True,
+    candidate >= sector >= persistent cell fractions share one denominator
+    and the funnel is monotonic.
+    """
     if tuple(blocking.dims) != ("time_z500", "lon"):
         raise ContractError("blocking must have dimensions ('time_z500', 'lon')")
+    lon = np.asarray(blocking["lon"].values, dtype=float)
+    dlon = float(np.min(np.abs(np.diff(lon))))
+    half_width = int(np.round(tolerance_deg / dlon))
     min_steps = int(np.ceil(min_persistence_days * 24.0 / timestep_hours))
-    present = blocking.any("lon")
-    values = present.values.astype(bool)
-    run_lengths = np.zeros(values.size, dtype=int)
-    start = 0
-    while start < values.size:
-        if not values[start]:
-            start += 1
-            continue
-        end = start
-        while end < values.size and values[end]:
-            end += 1
-        run_lengths[start:end] = end - start
-        start = end
+
+    blocked = np.asarray(blocking.values, dtype=bool)
+    neighbourhood = _longitude_dilation(blocked, half_width)
+    run_lengths = _persistence_run_lengths(neighbourhood)
+    persistent_values = blocked & (run_lengths >= min_steps)
     persistent = xr.DataArray(
-        values & (run_lengths >= min_steps),
-        dims=("time_z500",),
-        coords={"time_z500": blocking["time_z500"]},
+        persistent_values,
+        dims=("time_z500", "lon"),
+        coords={"time_z500": blocking["time_z500"], "lon": blocking["lon"]},
         name="persistent_blocking",
-        attrs={"units": "1", "long_name": "domain-wide blocking persistence mask"},
+        attrs={"units": "1", "long_name": "per-longitude blocking persistence mask"},
     )
     return xr.Dataset(
         {
@@ -189,5 +217,31 @@ def persistence_summary(
             "minimum_persistence_days": min_persistence_days,
             "minimum_persistence_steps": min_steps,
             "timestep_hours": timestep_hours,
+            "longitude_tolerance_deg": tolerance_deg,
         },
     )
+
+
+def daily_mean_z500(z500: xr.DataArray) -> xr.DataArray:
+    """Daily-mean Z500: TM1990 is a daily index, so 6-hourly input is averaged.
+
+    Daily means remove the within-day cycle and make one timestep equal one
+    day, so the 5-day persistence test is on actual days.
+    """
+    if "time_z500" not in z500.dims:
+        raise ContractError("z500 must carry a 'time_z500' dimension")
+    z500 = z500.reset_index("time_z500").assign_coords(
+        time_z500=z500["time_z500"].values.astype("datetime64[ns]")
+    )
+    daily = z500.resample(time_z500="1D").mean()
+    daily.attrs = dict(z500.attrs)
+    daily.attrs["temporal_aggregation"] = "daily mean"
+    return daily
+
+
+def blocked_day_frequency(blocking: xr.DataArray) -> xr.DataArray:
+    """Blocked-day frequency in % at each longitude (mean over time)."""
+    if "lon" not in blocking.dims:
+        raise ContractError("blocking must carry a 'lon' dimension")
+    freq = blocking.mean("time_z500") * 100.0
+    return freq.rename("blocked_day_frequency").assign_attrs(units="%", long_name="blocked-day frequency")

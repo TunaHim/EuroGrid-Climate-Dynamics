@@ -144,6 +144,22 @@ def test_validation_metrics_low_wind_hit_rate():
     cap = tidy_frame("50Hertz", "wind_onshore", [1000.0] * 24)
     m = validation_metrics(mod, gen, cap, "50Hertz")
     assert m["low_wind_hit_rate"] == pytest.approx(1.0)
+    assert m["low_wind_far"] == pytest.approx(0.0)
+    assert m["low_wind_csi"] == pytest.approx(1.0)
+
+
+def test_validation_metrics_low_wind_false_alarms():
+    # model predicts calm on 3 of 4 obs-calm hours and calls calm on 6 hours
+    # total: hit rate 3/4, FAR 1 - 3/6, CSI 3/7
+    obs_pattern = [0.05, 0.08, 0.09, 0.07] + [0.5] * 20
+    mod_pattern = [0.05, 0.08, 0.09, 0.5] + [0.05, 0.06, 0.07] + [0.5] * 17
+    mod = model_frame("50Hertz", "wind_onshore", mod_pattern, 24)
+    gen = tidy_frame("50Hertz", "wind_onshore", [v * 1000.0 for v in obs_pattern])
+    cap = tidy_frame("50Hertz", "wind_onshore", [1000.0] * 24)
+    m = validation_metrics(mod, gen, cap, "50Hertz")
+    assert m["low_wind_hit_rate"] == pytest.approx(0.75)
+    assert m["low_wind_far"] == pytest.approx(0.5)
+    assert m["low_wind_csi"] == pytest.approx(3 / 7)
 
 
 def test_validation_metrics_bias_direction():

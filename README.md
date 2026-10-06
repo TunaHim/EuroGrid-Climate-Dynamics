@@ -43,9 +43,18 @@ src/eurogrid/contract.py  canonical (time, lat, lon) dataset contract every load
 src/eurogrid/data/        loaders: smard, era5, eerie          (phases 01, 02, 06)
 src/eurogrid/diagnostics/ blocking, dunkelflaute, ramp_rates   (phase 04)
 src/eurogrid/models/      wind -> generation transfer          (phase 03)
+src/eurogrid/plotting.py  shared figure style, map and caption helpers
 dashboard/                thin Streamlit app                   (planned, phase 05)
 tests/                    offline; CI runs with sockets disabled
+notebooks/                01_data  02_wind_to_power  03_blocking  04_dunkelflaute
 ```
+
+## Notebooks (read in order, ~30 min)
+
+- `notebooks/01_data.ipynb` — what ERA5 and SMARD data were downloaded, domain, coverage and quality checks.
+- `notebooks/02_wind_to_power.ipynb` — ERA5 100 m wind → capacity factor through the transfer model, validated against SMARD.
+- `notebooks/03_blocking.ipynb` — TM1990 blocking detection on five DJF winters, blocked-day frequency vs longitude.
+- `notebooks/04_dunkelflaute.ipynb` — capacity-weighted renewable droughts in ERA5 vs SMARD and their overlap with blocking.
 
 ## Build order and gates
 
@@ -54,8 +63,8 @@ tests/                    offline; CI runs with sockets disabled
 | 00 | scaffold, dataset contract, CI | green CI, contract assertions tested |
 | 01 | SMARD client + installed capacity | Jan 2023 and Nov–Dec 2024 cached, offline fixtures |
 | 02 | ERA5 loader (100 m winds, Z500) | one wind map that looks like Europe |
-| 03 | transfer function + SMARD validation — done, see `notebooks/03_transfer_validation.ipynb` | bias/correlation figure by zone |
-| 04 | TM1990 blocking, Dunkelflaute sweep, ramps + aliasing | blocking frequency vs longitude matches published climatology |
+| 03 | transfer function + SMARD validation — done, see `notebooks/02_wind_to_power.ipynb` | bias/correlation figure by zone |
+| 04 | TM1990 blocking (5-winter ERA5, `notebooks/03_blocking.ipynb`), Dunkelflaute (`notebooks/04_dunkelflaute.ipynb`); ramps + aliasing pending | blocking frequency vs longitude compared to published climatology |
 | 05 | thin dashboard | builds headless |
 | 06 | EERIE historical blocking evaluation | model-vs-reanalysis figure, below-ground fraction reported |
 | 07 | SSP2-4.5 projection (gated on 06) | historical bias attached to every future statistic |
