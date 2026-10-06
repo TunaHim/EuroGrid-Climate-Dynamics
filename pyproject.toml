@@ -9,7 +9,7 @@ description = "Euro-Atlantic blocking, wind-drought and ramp diagnostics: ERA5 +
 requires-python = ">=3.11"
 dependencies = [
   "numpy>=1.26",
-  "xarray>=2024.6",
+  "xarray>=2024.6,<2025.10",  # open_group(zarr_format=...) breaks with zarr<3 pinned below
   "dask[array]>=2024.6",
   "zarr>=2.18,<3",
   "fsspec>=2024.6",
