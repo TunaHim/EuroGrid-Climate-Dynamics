@@ -4,8 +4,9 @@ Store facts verified 2026-09-21 against
 ``gs://gcp-public-data-arco-era5/ar/full_37-1h-0p25deg-chunk-1.zarr-v3``:
 
 * One store carries everything we need: ``100m_u_component_of_wind``,
-  ``100m_v_component_of_wind``, ``surface_pressure`` (2-D) and ``geopotential``
-  on 37 pressure levels (3-D). Hourly, 0.25 deg, ``latitude`` 90 -> -90,
+  ``100m_v_component_of_wind``, ``surface_pressure``,
+  ``surface_solar_radiation_downwards`` (2-D) and ``geopotential`` on 37
+  pressure levels (3-D). Hourly, 0.25 deg, ``latitude`` 90 -> -90,
   ``longitude`` 0 -> 359.75 (needs :func:`~eurogrid.contract.roll_longitude`).
 * The time axis is padded to 2050; ``attrs["valid_time_stop"]`` marks the
   real end (2026-06-30 at verification). Requests past it are rejected here.
@@ -15,9 +16,11 @@ Store facts verified 2026-09-21 against
   so Z500 is pulled at a coarser stride (6 h default; TM1990 is a daily index).
 
 Output variables follow :mod:`eurogrid.contract`: ``u100``, ``v100``, ``ws100``,
-``sp`` (hourly) and ``z500`` (strided), all on ``(time, lat, lon)`` cropped to
-the domain. Each call is persisted once to a local Zarr under ``cache_dir`` and
-re-opened from there afterwards.
+``sp`` and ``ssrd`` (hourly), plus ``z500`` (strided), all on ``(time, lat,
+lon)`` cropped to the domain. The raw ERA5 ``ssrd`` accumulation is converted
+from J m-2 per hour to a mean hourly irradiance in W m-2. Each call is
+persisted once to a local Zarr under ``cache_dir`` and re-opened from there
+afterwards.
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ SINGLE_LEVEL: Final[dict[str, str]] = {
     "100m_u_component_of_wind": "u100",
     "100m_v_component_of_wind": "v100",
     "surface_pressure": "sp",
+    "surface_solar_radiation_downwards": "ssrd",
 }
 GEOPOTENTIAL: Final = "geopotential"
 Z500_LEVEL_HPA: Final = 500
@@ -71,6 +75,15 @@ def normalise(raw: xr.Dataset, z500_stride_hours: int) -> xr.Dataset:
         out[dst] = ds[src].transpose("time", "lat", "lon")
     out["u100"].attrs["units"] = out["v100"].attrs["units"] = "m s-1"
     out["sp"].attrs["units"] = "Pa"
+    ssrd = ds["surface_solar_radiation_downwards"].transpose("time", "lat", "lon")
+    # ARCO stores hourly ERA5 ssrd as accumulated energy. Small negative
+    # round-off values occur at night and are physically equivalent to zero.
+    out["ssrd"] = ssrd.clip(min=0) / 3600.0
+    out["ssrd"].attrs.update(
+        units="W m-2",
+        long_name="hourly mean surface downward shortwave irradiance",
+        source_units="J m-2 per hour",
+    )
     out["ws100"] = np.hypot(out["u100"], out["v100"])
     out["ws100"].attrs["units"] = "m s-1"
 
@@ -116,8 +129,11 @@ def load_era5(
     )
     path = cache_dir / key
     if path.exists():
-        log.info("era5 cache hit %s", path)
-        return _validate(xr.open_zarr(path, consolidated=True))
+        cached = xr.open_zarr(path, consolidated=True)
+        if "ssrd" in cached:
+            log.info("era5 cache hit %s", path)
+            return _validate(cached)
+        log.info("rebuilding legacy wind-only ERA5 cache %s", path)
 
     raw = store if store is not None else open_arco_era5()
     _check_time_window(raw, start, end)
@@ -137,6 +153,77 @@ def load_era5(
         ds[var].encoding = {}  # otherwise the store's (1, 721, 1440) chunking is carried over
     ds.to_zarr(path, mode="w", consolidated=True)
     return _validate(xr.open_zarr(path, consolidated=True))
+
+
+def load_era5_z500(
+    start: datetime,
+    end: datetime,
+    lat_min: float,
+    lat_max: float,
+    lon_min: float,
+    lon_max: float,
+    cache_dir: str | Path = "data/era5",
+    z500_stride_hours: int = 6,
+    store: xr.Dataset | None = None,
+) -> xr.DataArray:
+    """Load only Z500 for blocking studies and persist it as a local Zarr.
+
+    This avoids downloading the hourly wind and surface-pressure fields when
+    a blocking benchmark needs only the 500 hPa geopotential-height field.
+    """
+    cache_dir = Path(cache_dir)
+    key = (
+        f"era5_z500_{start:%Y%m%dT%H}_{end:%Y%m%dT%H}"
+        f"_lat{lat_min:g}_{lat_max:g}_lon{lon_min:g}_{lon_max:g}_z{z500_stride_hours}h.zarr"
+    )
+    path = cache_dir / key
+    if path.exists():
+        return xr.open_zarr(path, consolidated=True)["z500"]
+
+    raw = store if store is not None else open_arco_era5()
+    _check_time_window(raw, start, end)
+    raw = raw[["geopotential"]].sel(
+        time=slice(start, end),
+        level=[Z500_LEVEL_HPA],
+    )
+    raw = raw.sel(time=raw.time < np.datetime64(end))
+    if raw.sizes["time"] == 0:
+        raise ValueError(f"no ERA5 timesteps in [{start}, {end})")
+
+    z500 = raw["geopotential"].sel(level=Z500_LEVEL_HPA, drop=True)
+    z500 = z500.isel(time=slice(None, None, z500_stride_hours))
+    z500 = (z500.rename({"latitude": "lat", "longitude": "lon"}) / G0).rename(time="time_z500")
+    z500 = z500.transpose("time_z500", "lat", "lon")
+    z500.attrs = {
+        "units": "m",
+        "long_name": "500 hPa geopotential height",
+        "stride_hours": z500_stride_hours,
+    }
+    z500 = subset_domain(
+        roll_longitude(z500),
+        lat_min,
+        lat_max,
+        lon_min,
+        lon_max,
+    )
+    _validate_z500(z500)
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    z500 = z500.chunk({"time_z500": 24})
+    dataset = z500.to_dataset(name="z500")
+    dataset.attrs["source"] = "era5"
+    for var in dataset.variables:
+        dataset[var].encoding = {}
+    dataset.to_zarr(path, mode="w", consolidated=True)
+    return xr.open_zarr(path, consolidated=True)["z500"]
+
+
+def _validate_z500(z500: xr.DataArray) -> xr.DataArray:
+    """Validate a standalone Z500 array against the canonical contract."""
+    dataset = z500.rename(time_z500="time").to_dataset(name="z500")
+    dataset.attrs["source"] = "era5"
+    validate_canonical(dataset)
+    return z500
 
 
 def _main() -> None:  # pragma: no cover - thin CLI

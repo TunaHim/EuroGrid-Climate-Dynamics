@@ -30,6 +30,7 @@ VARIABLES: Final[dict[str, str]] = {
     "u100": "m s-1",  # eastward wind at (or proxy for) 100 m
     "v100": "m s-1",  # northward wind at (or proxy for) 100 m
     "ws100": "m s-1",  # wind speed at (or proxy for) 100 m
+    "ssrd": "W m-2",  # hourly mean surface downward shortwave irradiance
     "z500": "m",  # 500 hPa geopotential *height* (geopotential / g)
     "z_level": "m",  # geopotential height of the proxy pressure level
     "sp": "Pa",  # surface pressure
