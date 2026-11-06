@@ -35,6 +35,16 @@ out of scope for v1.
 - `gr025` is a 0.25° regridded product. Nothing here is a km-scale analysis
   unless a native-resolution case study is added (stretch goal).
 
+## Data sources and access
+
+| Data | Source | Access in this repository |
+|---|---|---|
+| ERA5 hourly 100 m wind and Z500 | ARCO-ERA5 on Google Cloud (`gs://gcp-public-data-arco-era5`) | Read anonymously as cloud Zarr with xarray; the cropped window is cached once as local Zarr (`src/eurogrid/data/era5.py`) |
+| German generation and installed capacity by TSO zone | SMARD (Bundesnetzagentur) | JSON endpoints fetched per week and cached as Parquet with Polars (`src/eurogrid/data/smard.py`) |
+| EERIE IFS-FESOM2-SR historical and SSP2-4.5 | DKRZ EERIE cloud | Zarr endpoint (planned loader, phase 06) |
+
+Every loader returns the same canonical `(time, lat, lon)` dataset contract, which is checked in the offline test suite.
+
 ## Layout
 
 ```
@@ -76,3 +86,7 @@ conda env create -f environment.yml && conda activate eurogrid
 pytest          # network disabled
 ruff check . && ruff format --check .
 ```
+
+## Licence
+
+Code: MIT, see [LICENSE](LICENSE). Data: see *Data sources and access*; third-party data keep their own terms.
