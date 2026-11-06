@@ -4,6 +4,8 @@ Does a kilometre-scale coupled climate model (EERIE IFS-FESOM2) reproduce
 observed Euro-Atlantic blocking and European wind-drought statistics, and
 what would that imply for German renewable generation at mid-century?
 
+**How it is built:** a one-page overview of the data pipeline (sources, dataset contract, caching, tests and CI) is in [`docs/engineering_overview.html`](docs/engineering_overview.html), published at https://tunahim.github.io/EuroGrid-Climate-Dynamics/engineering_overview.html once GitHub Pages is enabled.
+
 ## The claim this repository makes
 
 We build and validate a blocking / Dunkelflaute / ramp-rate pipeline on

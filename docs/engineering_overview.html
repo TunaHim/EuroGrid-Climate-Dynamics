@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it is built · EuroGrid-Climate-Dynamics</title>
+<style>
+:root{--bg:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--line:#e1e0d9;--axis:#c3c2b7;
+--blue:#2a78d6;--blue-soft:#cde2fb;--orange:#eb6834;--orange-soft:#fbe0d4;--aqua:#1baf7a;--aqua-soft:#d3f1e5;--yellow:#eda100;--yellow-soft:#fcefc9;--violet:#4a3aa7;--violet-soft:#e2def7;}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink2:#c3c2b7;--muted:#898781;--line:#2c2c2a;--axis:#383835;
+--blue:#3987e5;--blue-soft:#17324f;--orange:#d95926;--orange-soft:#3d2216;--aqua:#199e70;--aqua-soft:#12342a;--yellow:#c98500;--yellow-soft:#3a2d0c;--violet:#9085e9;--violet-soft:#2a2550;}}
+:root[data-theme="dark"]{--bg:#0d0d0d;--surface:#1a1a19;--ink:#ffffff;--ink2:#c3c2b7;--muted:#898781;--line:#2c2c2a;--axis:#383835;
+--blue:#3987e5;--blue-soft:#17324f;--orange:#d95926;--orange-soft:#3d2216;--aqua:#199e70;--aqua-soft:#12342a;--yellow:#c98500;--yellow-soft:#3a2d0c;--violet:#9085e9;--violet-soft:#2a2550;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1060px;margin:0 auto;padding:28px 16px 64px}
+h1{font-size:26px;margin:0 0 4px}
+h2{font-size:19px;margin:40px 0 8px}
+p.lead{color:var(--ink2);margin:0 0 20px;max-width:760px}
+p{max-width:780px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.grid .card{margin:0}
+.card h3{font-size:15px;margin:0 0 6px}
+.card p{margin:0;color:var(--ink2);font-size:14px}
+.tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:10px;margin-bottom:6px}
+.tag.blue{background:var(--blue-soft);color:var(--blue)} .tag.orange{background:var(--orange-soft);color:var(--orange)}
+.tag.aqua{background:var(--aqua-soft);color:var(--aqua)} .tag.violet{background:var(--violet-soft);color:var(--violet)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:24px;font-weight:600}
+.stat span{color:var(--ink2);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:14px;background:var(--surface)}
+th,td{border-bottom:1px solid var(--line);padding:7px 10px;text-align:left;vertical-align:top}
+th{color:var(--ink2);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.wrap{overflow-x:auto}
+svg text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.svgbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto}
+.note{color:var(--muted);font-size:13px}
+</style>
+<meta name="description" content="How cloud ERA5 reanalysis and German grid-operator data travel through one tested dataset contract into a local Zarr and Parquet cache and on to blocking and renewable-drought diagnostics.">
+<meta name="author" content="Himansu Kesari Pradhan">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M5 20c4-8 8-8 11 0s7 8 11 0' stroke='white' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<style>
+.sitenav{position:sticky;top:0;z-index:10;background:var(--surface,#fcfcfb);border-bottom:1px solid var(--line,#e1e0d9)}
+.sitenav div{max-width:1100px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;font:14px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.sitenav b{margin-right:8px;color:var(--ink,#0b0b0b)}
+.sitenav a{color:var(--ink2,#52514e);text-decoration:none}
+.sitenav a:hover,.sitenav a.here{color:var(--blue,#2a78d6)}
+.sitefoot{border-top:1px solid var(--line,#e1e0d9);margin-top:32px;background:var(--surface,#fcfcfb);color:var(--ink2,#52514e)}
+.sitefoot div.in{max-width:1100px;margin:0 auto;padding:18px 16px 26px;display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px 28px;font:13px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.sitefoot b{display:block;color:var(--ink,#0b0b0b);margin-bottom:3px}
+.sitefoot a{color:var(--blue,#2a78d6)}
+.sitefoot p{margin:0}
+</style>
+</head>
+<body>
+<!-- site:nav --><nav class="sitenav"><div><b>EuroGrid-Climate-Dynamics</b><a href="engineering_overview.html" class="here">How it is built</a><a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics/blob/main/docs/project-progress-report.md">Progress report</a><a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics/tree/main/notebooks">Notebooks</a><a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics">Code on GitHub</a></div></nav><!-- /site:nav -->
+<main>
+<h1>How the data pipeline works</h1>
+<p class="lead">This page covers the data and software side of EuroGrid-Climate-Dynamics. It shows how cloud reanalysis data and
+German grid-operator data are pulled from two public services. It then follows that data through one shared dataset contract, into a small
+local cache, and on to the blocking and renewable-drought diagnostics. The project is in progress, and section 5 shows which phases are
+done.</p>
+
+<div class="stats">
+  <div class="stat"><b>2 live sources</b><span>ARCO-ERA5 Zarr on Google Cloud, SMARD JSON API</span></div>
+  <div class="stat"><b>5 winters</b><span>of hourly ERA5 at 0.25°, Dec–Feb 2020–21 to 2024–25</span></div>
+  <div class="stat"><b>1,480</b><span>SMARD weekly files cached as Parquet (74 weeks)</span></div>
+  <div class="stat"><b>7 modules</b><span>about 1,500 lines of Python</span></div>
+  <div class="stat"><b>51 tests</b><span>offline, network blocked, all passing</span></div>
+  <div class="stat"><b>CI on every push</b><span>ruff lint + format check, pytest</span></div>
+</div>
+
+<h2>1. The pipeline at a glance</h2>
+<p>Data flows from left to right. Each box is one stage, and the blue text names the code that does it. Dashed boxes are planned phases.</p>
+<div class="svgbox">
+<svg viewBox="0 0 1000 400" width="100%" role="img" aria-label="Pipeline from data sources to outputs">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker></defs>
+  <!-- sources -->
+  <text x="10" y="22" font-size="13" font-weight="600" fill="var(--ink2)">1 · SOURCES</text>
+  <rect x="10" y="34" width="180" height="98" rx="8" fill="var(--blue-soft)" stroke="var(--blue)"/>
+  <text x="22" y="56" font-size="13" font-weight="600" fill="var(--ink)">ARCO-ERA5</text>
+  <text x="22" y="74" font-size="12" fill="var(--ink2)">Google Cloud bucket,</text>
+  <text x="22" y="90" font-size="12" fill="var(--ink2)">anonymous, Zarr v3</text>
+  <text x="22" y="106" font-size="12" fill="var(--ink2)">100 m wind, sp, ssrd,</text>
+  <text x="22" y="122" font-size="12" fill="var(--ink2)">geopotential (37 levels)</text>
+  <rect x="10" y="144" width="180" height="98" rx="8" fill="var(--blue-soft)" stroke="var(--blue)"/>
+  <text x="22" y="166" font-size="13" font-weight="600" fill="var(--ink)">SMARD (BNetzA)</text>
+  <text x="22" y="184" font-size="12" fill="var(--ink2)">JSON over HTTPS,</text>
+  <text x="22" y="200" font-size="12" fill="var(--ink2)">one file per week,</text>
+  <text x="22" y="216" font-size="12" fill="var(--ink2)">generation + installed</text>
+  <text x="22" y="232" font-size="12" fill="var(--ink2)">capacity, 4 TSO zones</text>
+  <rect x="10" y="254" width="180" height="64" rx="8" fill="var(--surface)" stroke="var(--axis)" stroke-dasharray="4 3"/>
+  <text x="22" y="276" font-size="13" font-weight="600" fill="var(--ink)">EERIE IFS-FESOM2-SR</text>
+  <text x="22" y="294" font-size="12" fill="var(--ink2)">DKRZ cloud, Zarr v2</text>
+  <text x="22" y="310" font-size="11" fill="var(--muted)">planned loader, phase 06</text>
+
+  <!-- extract -->
+  <text x="220" y="22" font-size="13" font-weight="600" fill="var(--ink2)">2 · EXTRACT</text>
+  <rect x="220" y="34" width="170" height="284" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="232" y="56" font-size="13" font-weight="600" fill="var(--ink)">Loaders</text>
+  <text x="232" y="78" font-size="12" fill="var(--ink2)">① open lazily (xarray,</text>
+  <text x="246" y="94" font-size="12" fill="var(--ink2)">Dask, gcsfs)</text>
+  <text x="232" y="114" font-size="12" fill="var(--ink2)">② reject dates past the</text>
+  <text x="246" y="130" font-size="12" fill="var(--ink2)">store's real end</text>
+  <text x="232" y="150" font-size="12" fill="var(--ink2)">③ pick only the weekly</text>
+  <text x="246" y="166" font-size="12" fill="var(--ink2)">files that overlap</text>
+  <text x="232" y="186" font-size="12" fill="var(--ink2)">④ retry with backoff</text>
+  <text x="246" y="202" font-size="12" fill="var(--ink2)">on 429 and 5xx</text>
+  <text x="232" y="222" font-size="12" fill="var(--ink2)">⑤ 404 for an inland</text>
+  <text x="246" y="238" font-size="12" fill="var(--ink2)">offshore zone → zero</text>
+  <text x="232" y="290" font-size="11" fill="var(--blue)">data/era5.py</text>
+  <text x="232" y="306" font-size="11" fill="var(--blue)">data/smard.py</text>
+
+  <!-- normalise -->
+  <text x="420" y="22" font-size="13" font-weight="600" fill="var(--ink2)">3 · NORMALISE</text>
+  <rect x="420" y="34" width="170" height="284" rx="8" fill="var(--violet-soft)" stroke="var(--violet)"/>
+  <text x="432" y="56" font-size="13" font-weight="600" fill="var(--ink)">Dataset contract</text>
+  <text x="432" y="78" font-size="12" fill="var(--ink2)">dims (time, lat, lon)</text>
+  <text x="432" y="98" font-size="12" fill="var(--ink2)">lat 90 → −90, lon</text>
+  <text x="432" y="114" font-size="12" fill="var(--ink2)">−180 → 180 (rolled)</text>
+  <text x="432" y="134" font-size="12" fill="var(--ink2)">fixed names + units:</text>
+  <text x="432" y="150" font-size="12" fill="var(--ink2)">u100, ws100, z500, sp,</text>
+  <text x="432" y="166" font-size="12" fill="var(--ink2)">ssrd (J m⁻² → W m⁻²)</text>
+  <text x="432" y="186" font-size="12" fill="var(--ink2)">crop to the domain</text>
+  <text x="432" y="206" font-size="12" fill="var(--ink2)">tidy Polars frames:</text>
+  <text x="432" y="222" font-size="12" fill="var(--ink2)">time, zone, variable,</text>
+  <text x="432" y="238" font-size="12" fill="var(--ink2)">value_mw (UTC)</text>
+  <text x="432" y="306" font-size="11" fill="var(--blue)">contract.py</text>
+
+  <!-- cache -->
+  <text x="620" y="22" font-size="13" font-weight="600" fill="var(--ink2)">4 · CACHE</text>
+  <rect x="620" y="34" width="160" height="140" rx="8" fill="var(--aqua-soft)" stroke="var(--aqua)"/>
+  <text x="632" y="56" font-size="13" font-weight="600" fill="var(--ink)">Local store</text>
+  <text x="632" y="78" font-size="12" fill="var(--ink2)">ERA5 → local Zarr,</text>
+  <text x="632" y="94" font-size="12" fill="var(--ink2)">24 h chunks; key =</text>
+  <text x="632" y="110" font-size="12" fill="var(--ink2)">window + box + stride</text>
+  <text x="632" y="130" font-size="12" fill="var(--ink2)">SMARD → one Parquet</text>
+  <text x="632" y="146" font-size="12" fill="var(--ink2)">file per weekly JSON</text>
+  <text x="632" y="164" font-size="11" fill="var(--blue)">data/era5 · data/smard</text>
+  <!-- transform -->
+  <text x="620" y="198" font-size="13" font-weight="600" fill="var(--ink2)">5 · TRANSFORM</text>
+  <rect x="620" y="208" width="160" height="110" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="632" y="230" font-size="13" font-weight="600" fill="var(--ink)">Wind → power</text>
+  <text x="632" y="250" font-size="12" fill="var(--ink2)">power curve on every</text>
+  <text x="632" y="266" font-size="12" fill="var(--ink2)">cell, cos-lat mean</text>
+  <text x="632" y="282" font-size="12" fill="var(--ink2)">over fleet boxes</text>
+  <text x="632" y="306" font-size="11" fill="var(--blue)">models/transfer.py</text>
+
+  <!-- diagnostics / results -->
+  <text x="810" y="22" font-size="13" font-weight="600" fill="var(--ink2)">6 · RESULTS</text>
+  <rect x="810" y="34" width="180" height="120" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="822" y="56" font-size="13" font-weight="600" fill="var(--ink)">Diagnostics</text>
+  <text x="822" y="76" font-size="12" fill="var(--ink2)">TM1990 blocking</text>
+  <text x="822" y="92" font-size="12" fill="var(--ink2)">Dunkelflaute events,</text>
+  <text x="822" y="108" font-size="12" fill="var(--ink2)">ERA5 vs SMARD check</text>
+  <text x="822" y="128" font-size="11" fill="var(--blue)">diagnostics/blocking.py</text>
+  <text x="822" y="143" font-size="11" fill="var(--blue)">diagnostics/dunkelflaute.py</text>
+  <rect x="810" y="166" width="180" height="72" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="822" y="188" font-size="13" font-weight="600" fill="var(--ink)">4 notebooks</text>
+  <text x="822" y="206" font-size="12" fill="var(--ink2)">data → wind to power</text>
+  <text x="822" y="222" font-size="12" fill="var(--ink2)">→ blocking → droughts</text>
+  <rect x="810" y="250" width="180" height="68" rx="8" fill="var(--surface)" stroke="var(--axis)" stroke-dasharray="4 3"/>
+  <text x="822" y="272" font-size="13" font-weight="600" fill="var(--ink)">Dashboard</text>
+  <text x="822" y="290" font-size="12" fill="var(--ink2)">thin Streamlit app</text>
+  <text x="822" y="308" font-size="11" fill="var(--muted)">planned, phase 05</text>
+
+  <!-- arrows -->
+  <line x1="190" y1="83" x2="218" y2="83" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="190" y1="193" x2="218" y2="193" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="190" y1="286" x2="218" y2="286" stroke="var(--axis)" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <line x1="390" y1="176" x2="418" y2="176" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="590" y1="104" x2="618" y2="104" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="700" y1="174" x2="700" y2="206" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="780" y1="94" x2="808" y2="94" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="780" y1="262" x2="808" y2="120" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="900" y1="154" x2="900" y2="164" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="10" y="350" font-size="12" fill="var(--ink2)">Every loader returns the same (time, lat, lon) contract, so the diagnostics will run unchanged on the EERIE model once its loader exists.</text>
+  <text x="10" y="370" font-size="12" fill="var(--ink2)">That shared contract is what makes a fair model-versus-reanalysis comparison possible.</text>
+</svg>
+</div>
+
+<h2>2. Why chunk layout decides what gets downloaded</h2>
+<p>Cloud Zarr stores are read chunk by chunk, so the way a store is chunked sets the real cost of a request. Each store's
+layout was checked against the live service before any loader was written, and the result is written down with its date in
+<code>config/settings.yaml</code>.</p>
+<div class="wrap">
+<table>
+<thead><tr><th>Store</th><th>How it is chunked</th><th>What the pipeline does about it</th></tr></thead>
+<tbody>
+<tr><td><b>ARCO-ERA5</b>, surface fields</td><td>One hour × the whole globe (1 × 721 × 1440)</td><td>A small European box saves no transfer. The box is cut in memory once and saved locally, so later reads never touch the cloud again.</td></tr>
+<tr><td><b>ARCO-ERA5</b>, geopotential</td><td>One hour × 37 levels × the whole globe</td><td>Each hour of Z500 costs a full 37-level chunk. Blocking is a daily index, so Z500 is read every 6 hours instead of hourly, which cuts transfer by six. Blocking studies also have a Z500-only loader, so they don't download wind fields they don't need.</td></tr>
+<tr><td><b>ARCO-ERA5</b>, time axis</td><td>Padded to 2050; the real end is in <code>valid_time_stop</code></td><td>Requests past the real end are rejected at once, instead of silently returning empty or fill values.</td></tr>
+<tr><td><b>EERIE</b> gr025 (planned)</td><td>Flattened 1,038,240-point grid, chunks of 3 times × 3 levels × globe, 6-hourly, no 100 m wind</td><td>The loader will roll the grid back to latitude and longitude and cache once. It will use the 1000 hPa wind as a hub-height proxy and flag points where that level lies underground.</td></tr>
+<tr><td><b>SMARD</b></td><td>One JSON file per week per filter and zone, with an index listing the weeks</td><td>The pipeline reads the index first and fetches only the weeks that overlap the request. Each weekly file is cached as Parquet, so nothing is downloaded twice.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>3. Problems the pipeline had to solve</h2>
+<div class="grid">
+  <div class="card"><span class="tag orange">undocumented API</span><h3>Finding the capacity series</h3>
+  <p>SMARD's installed-capacity filter ids (186, 187, 188) are not in its public API spec. They were identified by matching
+  Germany-wide yearly values against known capacity, for example 2024: 59.8 GW onshore, 8.5 GW offshore, 76.6 GW solar.</p></div>
+  <div class="card"><span class="tag orange">missing ≠ zero</span><h3>Offshore wind in inland zones</h3>
+  <p>The endpoint returns 404 for offshore wind in Amprion and TransnetBW, which have no coastline. The client turns this into an
+  explicit zero series, but any other 404 still stops the run with an error, so a real gap cannot pass as zero.</p></div>
+  <div class="card"><span class="tag orange">units</span><h3>Energy versus power</h3>
+  <p>SMARD reports energy per interval (MWh) and ERA5 stores solar radiation as accumulated J m⁻² per hour. Both are converted
+  to mean power, MW and W m⁻², and small negative night-time values are set to zero.</p></div>
+  <div class="card"><span class="tag orange">time</span><h3>Time zones and weeks</h3>
+  <p>SMARD's weekly files start at local midnight and shift with daylight saving time. All times are converted to UTC. The last file in the
+  index gets a week plus one hour, so a daylight-saving week is not cut short. Windows are half-open [start, end) throughout.</p></div>
+  <div class="card"><span class="tag blue">reliability</span><h3>Retries that know when to stop</h3>
+  <p>Requests retry with exponential backoff on rate limits (429), server errors and time-outs. They give up straight away on other client
+  errors, which a retry would not fix, and a short pause between weekly downloads keeps the load on the public server low.</p></div>
+  <div class="card"><span class="tag blue">caching</span><h3>No stale caches</h3>
+  <p>The ERA5 cache key holds the time window, the box and the Z500 stride, so a different request can never read an old
+  file. The store's encoding is cleared before writing, so the cloud's one-hour chunks are not copied into the local store.</p></div>
+  <div class="card"><span class="tag aqua">fair comparison</span><h3>One contract for every source</h3>
+  <p>Dimension order, coordinate direction, longitude range, variable names and units are checked by one function at every
+  loader exit. A source that breaks the contract fails loudly before any diagnostic runs.</p></div>
+  <div class="card"><span class="tag aqua">honesty</span><h3>Biases reported, not tuned away</h3>
+  <p>The wind-to-power model is deliberately simple. Its losses sit in one explicit factor that is reported, never fitted to SMARD,
+  so the mismatch with the observations is shown as a result in itself.</p></div>
+</div>
+
+<h2>4. How the code is organised and checked</h2>
+<div class="svgbox">
+<svg viewBox="0 0 1000 200" width="100%" role="img" aria-label="Layers of the code and the checks around them">
+  <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker></defs>
+  <rect x="20" y="20" width="300" height="160" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="36" y="44" font-size="13" font-weight="600" fill="var(--ink)">Data layer</text>
+  <text x="36" y="66" font-size="12" fill="var(--ink2)">data/era5.py · data/smard.py · contract.py</text>
+  <text x="36" y="94" font-size="12" fill="var(--ink2)">Each source is turned into the same</text>
+  <text x="36" y="110" font-size="12" fill="var(--ink2)">contract. The network call is passed in</text>
+  <text x="36" y="126" font-size="12" fill="var(--ink2)">(store=, fetch_json=), so tests swap it</text>
+  <text x="36" y="142" font-size="12" fill="var(--ink2)">for small made-up data.</text>
+  <rect x="350" y="20" width="300" height="160" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="366" y="44" font-size="13" font-weight="600" fill="var(--ink)">Model and diagnostics layer</text>
+  <text x="366" y="66" font-size="12" fill="var(--ink2)">models/transfer.py · diagnostics/*.py</text>
+  <text x="366" y="94" font-size="12" fill="var(--ink2)">Functions on xarray and Polars data that</text>
+  <text x="366" y="110" font-size="12" fill="var(--ink2)">accept only the contract, so the same</text>
+  <text x="366" y="126" font-size="12" fill="var(--ink2)">code runs on ERA5 now and on the</text>
+  <text x="366" y="142" font-size="12" fill="var(--ink2)">EERIE model later.</text>
+  <rect x="680" y="20" width="300" height="160" rx="8" fill="var(--surface)" stroke="var(--axis)"/>
+  <text x="696" y="44" font-size="13" font-weight="600" fill="var(--ink)">Configuration and presentation</text>
+  <text x="696" y="66" font-size="12" fill="var(--ink2)">config/settings.yaml · notebooks/</text>
+  <text x="696" y="94" font-size="12" fill="var(--ink2)">Domain, periods, dataset ids and</text>
+  <text x="696" y="110" font-size="12" fill="var(--ink2)">thresholds live in one file. Store facts</text>
+  <text x="696" y="126" font-size="12" fill="var(--ink2)">carry their verification date. Four</text>
+  <text x="696" y="142" font-size="12" fill="var(--ink2)">notebooks read in order.</text>
+  <line x1="320" y1="100" x2="348" y2="100" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow2)"/>
+  <line x1="650" y1="100" x2="678" y2="100" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#arrow2)"/>
+</svg>
+</div>
+<div class="wrap" style="margin-top:12px">
+<table>
+<thead><tr><th>Safeguard</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td>51 offline tests (pytest)</td><td>They cover the contract rules, SMARD week selection, the 404-to-zero rule and caching, ERA5 normalisation and cache keys, the power curve, blocking detection and Dunkelflaute event counting. Each test runs on small made-up data with a known answer.</td></tr>
+<tr><td>Network blocked in tests (pytest-socket)</td><td>No test can reach the internet. A test that tried to would fail, so the suite is fast and gives the same result anywhere.</td></tr>
+<tr><td>Continuous integration (GitHub Actions)</td><td>Every push and pull request installs the package, runs ruff lint and format checks, then the tests.</td></tr>
+<tr><td>Build phases with gates</td><td>Each phase (scaffold, SMARD, ERA5, transfer, diagnostics, dashboard, EERIE, projection) has a check it must pass before the next one starts.</td></tr>
+<tr><td>Packaged and pinned</td><td>pyproject.toml makes the code an installable package with pinned version ranges, and environment.yml rebuilds the same setup.</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>5. Where the project stands</h2>
+<div class="wrap">
+<table>
+<thead><tr><th>Phase</th><th>Deliverable</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>00</td><td>Scaffold, dataset contract, CI</td><td>done</td></tr>
+<tr><td>01</td><td>SMARD client and installed capacity</td><td>done</td></tr>
+<tr><td>02</td><td>ERA5 loader (100 m wind, Z500, solar)</td><td>done</td></tr>
+<tr><td>03</td><td>Wind-to-power transfer, validated against SMARD</td><td>done</td></tr>
+<tr><td>04</td><td>TM1990 blocking and Dunkelflaute on five winters</td><td>done; ramp rates pending</td></tr>
+<tr><td>05</td><td>Thin dashboard</td><td>planned</td></tr>
+<tr><td>06</td><td>EERIE historical blocking evaluation</td><td>planned</td></tr>
+<tr><td>07</td><td>SSP2-4.5 projection, always shown with the historical bias</td><td>planned, depends on 06</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2>6. In one sentence</h2>
+<div class="card"><p style="color:var(--ink);font-size:15px">Reanalysis data are read anonymously from a public cloud Zarr store and grid-operator data from a REST API. Both are retried, converted to one tested dataset contract and cached as Zarr and Parquet, so each byte is downloaded once. The same diagnostics then run on any source that meets the contract, which is what will allow a fair test of the EERIE model against reanalysis.</p></div>
+</main>
+<!-- site:foot --><footer class="sitefoot"><div class="in">
+<div><b>EuroGrid-Climate-Dynamics</b><p>A project by Himansu Kesari Pradhan, 2026, in progress. Code under the
+<a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics/blob/main/LICENSE">MIT licence</a>; source, tests and notebooks on
+<a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics">GitHub</a>. Page built 6 November 2026.</p></div>
+<div><b>Data credits</b><p>ERA5: Hersbach et al. (2020), Copernicus Climate Change Service, served as ARCO-ERA5 on Google Cloud.
+Generation and capacity: Bundesnetzagentur | SMARD.de. EERIE model output: EERIE consortium, served by DKRZ.</p></div>
+<div><b>More</b><p><a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics#readme">README</a> ·
+<a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics/blob/main/docs/project-progress-report.md">Progress report</a> ·
+<a href="https://github.com/TunaHim/EuroGrid-Climate-Dynamics/issues">Questions and comments</a></p></div>
+</div></footer><!-- /site:foot -->
+</body>
+</html>
