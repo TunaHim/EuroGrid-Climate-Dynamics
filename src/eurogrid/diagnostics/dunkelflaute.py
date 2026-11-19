@@ -14,6 +14,7 @@ offshore-only proxy would describe a small slice of the system.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Final
 
 import numpy as np
@@ -116,7 +117,10 @@ def era5_renewable_cf(
 def smard_renewable_cf(generation: pl.DataFrame, capacity: pl.DataFrame) -> pl.DataFrame:
     """Hourly national renewable CF from SMARD, capacity-weighted over all zones."""
     cap = capacity.rename({"value_mw": "capacity_mw"})
-    joined = generation.join(cap, on=["time", "zone", "variable"], how="left")
+    # A missing generation value must drop its capacity too, or the hour reads as a drought.
+    joined = generation.filter(pl.col("value_mw").is_not_null()).join(
+        cap, on=["time", "zone", "variable"], how="left"
+    )
     agg = joined.group_by("time").agg(
         pl.col("value_mw").sum().alias("gen_mw"),
         pl.col("capacity_mw").sum().alias("cap_mw"),
@@ -137,44 +141,44 @@ def daily_mean(frame: pl.DataFrame, value: str = "cf") -> pl.DataFrame:
 def detect_events(frame: pl.DataFrame, threshold: float, min_duration_hours: float) -> pl.DataFrame:
     """Consecutive runs with ``cf < threshold`` lasting >= ``min_duration_hours``.
 
-    ``frame`` must be sorted (time, cf). Returns one row per event:
-    start, end (exclusive), duration_hours, min_cf, mean_cf.
+    ``frame`` must be sorted (time, cf). A gap in the time axis (e.g. the
+    months between two concatenated winters, or a day dropped for missing
+    data) ends a run, so events never bridge it. Returns one row per event:
+    start, end (the last timestep inside the event, inclusive),
+    duration_hours, min_cf, mean_cf.
     """
     rows = list(frame.select("time", "cf").iter_rows())
-    events: list[dict] = []
-    run: list[tuple] = []
     step_hours = 24.0
     if len(rows) > 1:
-        step_hours = (rows[1][0] - rows[0][0]).total_seconds() / 3600.0
-    for time_, cf in rows:
-        if cf is not None and cf < threshold:
-            run.append((time_, cf))
-        else:
-            if run:
-                dur = len(run) * step_hours
-                if dur >= min_duration_hours:
-                    events.append(
-                        {
-                            "start": run[0][0],
-                            "end": run[-1][0],
-                            "duration_hours": dur,
-                            "min_cf": min(v for _, v in run),
-                            "mean_cf": float(np.mean([v for _, v in run])),
-                        }
-                    )
-                run = []
-    if run:
+        step_hours = min(
+            (b[0] - a[0]).total_seconds() / 3600.0 for a, b in zip(rows[:-1], rows[1:], strict=True)
+        )
+    events: list[dict] = []
+    run: list[tuple] = []
+
+    def close_run() -> None:
         dur = len(run) * step_hours
-        if dur >= min_duration_hours:
+        if run and dur >= min_duration_hours:
+            values = [v for _, v in run]
             events.append(
                 {
                     "start": run[0][0],
                     "end": run[-1][0],
                     "duration_hours": dur,
-                    "min_cf": min(v for _, v in run),
-                    "mean_cf": float(np.mean([v for _, v in run])),
+                    "min_cf": min(values),
+                    "mean_cf": float(np.mean(values)),
                 }
             )
+        run.clear()
+
+    for time_, cf in rows:
+        if run and (time_ - run[-1][0]).total_seconds() / 3600.0 > step_hours * 1.5:
+            close_run()
+        if cf is not None and cf < threshold:
+            run.append((time_, cf))
+        else:
+            close_run()
+    close_run()
     return pl.DataFrame(
         events,
         schema={
@@ -185,6 +189,17 @@ def detect_events(frame: pl.DataFrame, threshold: float, min_duration_hours: flo
             "mean_cf": pl.Float64,
         },
     )
+
+
+def event_days(events: pl.DataFrame) -> set:
+    """Every calendar date inside the events of :func:`detect_events` (start..end inclusive)."""
+    days: set = set()
+    for start, end in events.select("start", "end").iter_rows():
+        day = start.date()
+        while day <= end.date():
+            days.add(day)
+            day += timedelta(days=1)
+    return days
 
 
 def threshold_duration_matrix(

@@ -10,6 +10,7 @@ from eurogrid.diagnostics.dunkelflaute import (
     conditional_drought_probability,
     daily_mean,
     detect_events,
+    event_days,
     event_verification,
     smard_renewable_cf,
     solar_capacity_factor,
@@ -132,3 +133,48 @@ def test_daily_mean_resamples():
     daily = daily_mean(frame)
     assert daily.height == 2
     assert daily["cf"].to_list() == pytest.approx([0.1, 0.9])
+
+
+def daily_frame(dates, cfs):
+    return pl.DataFrame({"time": [datetime(*d, tzinfo=UTC) for d in dates], "cf": cfs})
+
+
+def test_detect_events_does_not_bridge_gap_between_winters():
+    # Low at the end of one winter and the start of the next: two events, not one.
+    dates = [(2021, 2, 27), (2021, 2, 28), (2021, 12, 1), (2021, 12, 2)]
+    ev = detect_events(daily_frame(dates, [0.05, 0.05, 0.05, 0.05]), 0.10, 48)
+    assert ev.height == 2
+    assert ev["duration_hours"].to_list() == [48.0, 48.0]
+
+
+def test_detect_events_gap_inside_run_splits_it():
+    dates = [(2024, 1, 1), (2024, 1, 2), (2024, 1, 4), (2024, 1, 5)]
+    assert detect_events(daily_frame(dates, [0.05] * 4), 0.10, 72).height == 0
+
+
+def test_event_days_covers_every_day_of_each_event():
+    dates = [(2024, 1, d) for d in range(1, 8)]
+    ev = detect_events(daily_frame(dates, [0.2, 0.05, 0.05, 0.05, 0.2, 0.05, 0.05]), 0.10, 48)
+    days = {d.day for d in event_days(ev)}
+    assert days == {2, 3, 4, 6, 7}
+
+
+def test_smard_renewable_cf_ignores_capacity_of_missing_generation():
+    t = datetime(2024, 1, 1, tzinfo=UTC)
+    gen = pl.DataFrame(
+        {
+            "time": [t, t],
+            "zone": ["TenneT", "Amprion"],
+            "variable": ["wind_onshore", "wind_onshore"],
+            "value_mw": [5000.0, None],
+        }
+    )
+    cap = pl.DataFrame(
+        {
+            "time": [t, t],
+            "zone": ["TenneT", "Amprion"],
+            "variable": ["wind_onshore", "wind_onshore"],
+            "value_mw": [10000.0, 10000.0],
+        }
+    )
+    assert smard_renewable_cf(gen, cap)["cf"].item() == pytest.approx(0.5)
